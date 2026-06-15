@@ -13,11 +13,11 @@ class VonNeumannExtractor:
 
     The output bits are packed into a `bytearray`. If the number of
     output bits is not a multiple of 8, the final partial byte is
-    either dropped or zero-padded depending on `pad_final_byte`.
+    dropped.
     """
 
-    def __init__(self, pad_final_byte: bool = False):
-        self.pad_final_byte = pad_final_byte
+    def __init__(self):
+        pass
 
     def extract(self, bits: bitarray) -> bytearray:
         output_bits = bitarray()
@@ -32,22 +32,14 @@ class VonNeumannExtractor:
                 continue  # discard 00 or 11
             elif first == 0 and second == 1:
                 output_bits.append(0)
-            else:  # first == 1 and second == 0
+            elif first == 1 and second == 0:
                 output_bits.append(1)
+            else:
+                raise ValueError('invalid bit value {} {}'.format(first, second))
 
         return self._pack_to_bytearray(output_bits)
 
     def _pack_to_bytearray(self, bits: bitarray) -> bytearray:
         remainder = len(bits) % 8
-
-        if remainder == 0:
-            return bytearray(bits.tobytes())
-
-        if self.pad_final_byte:
-            padded = bits.copy()
-            padded.extend([0] * (8 - remainder))
-            return bytearray(padded.tobytes())
-        else:
-            # Drop the trailing partial byte's worth of bits.
-            trimmed = bits[: len(bits) - remainder]
-            return bytearray(trimmed.tobytes())
+        bits = bits[: len(bits) - remainder] if remainder else bits
+        return bytearray(bits.tobytes())

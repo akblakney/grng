@@ -8,12 +8,14 @@ from .extract.von_neumann import VonNeumannExtractor
 from .pipeline import Pipeline
 from .sources.microphone import MicrophoneSource
 from .standardize.audio import AudioStandardizer
+from .validate.audio import AudioValidator
 
 
-# Registry mapping source names to (EntropySource factory, Standardizer factory).
-# Each factory is a zero-arg callable that constructs a fresh instance.
+# Registry mapping source names to (EntropySource factory, Standardizer factory,
+# Validator factory). Each factory is a zero-arg callable that constructs a
+# fresh instance.
 SOURCES = {
-    "audio": (MicrophoneSource, AudioStandardizer),
+    "audio": (MicrophoneSource, AudioStandardizer, AudioValidator),
 }
 
 
@@ -45,6 +47,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="Write output bytes to FILE. If omitted, output is printed "
         "to stdout as a hex string.",
+    )
+
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run validation checks on the raw/standardized data before "
+        "generating output (e.g. waveform plot, low-bits uniformity test).",
     )
 
     # Audio-specific options
@@ -94,6 +103,33 @@ def build_pipeline(args: argparse.Namespace) -> Pipeline:
     raise ValueError(f"Unknown source: {args.source}")
 
 
+def build_validator(args: argparse.Namespace):
+    if args.source == "audio":
+        return AudioValidator(sample_rate=args.rate)
+
+    raise ValueError(f"Unknown source: {args.source}")
+
+
+def run_validation(args: argparse.Namespace, pipeline: Pipeline) -> None:
+    """Read raw data, standardize it, and run all validation checks."""
+    if args.source == "audio":
+        with pipeline.source:
+            raw = pipeline.source.read_raw(num_chunks=args.num_chunks)
+    else:
+        raise ValueError(f"Unknown source: {args.source}")
+
+    values = pipeline.standardizer.standardize(raw)
+    validator = build_validator(args)
+
+    print("Running validation checks...", file=sys.stderr)
+    results = validator.run_all(raw, values)
+
+    for name, result in results.items():
+        if result is not None:
+            print(f"\n{name}:", file=sys.stderr)
+            print(result, file=sys.stderr)
+
+
 def run_source(args: argparse.Namespace, pipeline: Pipeline) -> bytearray:
     if args.source == "audio":
         return pipeline.run(num_chunks=args.num_chunks)
@@ -106,6 +142,10 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     pipeline = build_pipeline(args)
+
+    if args.validate:
+        run_validation(args, pipeline)
+
     output_bytes = run_source(args, pipeline)
 
     if not output_bytes:

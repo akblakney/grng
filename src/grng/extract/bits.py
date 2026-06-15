@@ -30,7 +30,7 @@ class LSBExtractor(BitExtractor):
 
     def extract(self, values: List[int]) -> bitarray:
         bits = bitarray()
-        mask = (1 << self.n) - 1
+        mask = (1 << self.n) - 1 # mask with n lowest bits
 
         for value in values:
             low_bits = value & mask

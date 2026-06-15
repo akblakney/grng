@@ -8,9 +8,6 @@ from .base import Standardizer
 
 class AudioStandardizer(Standardizer):
     """Converts raw 16-bit signed little-endian PCM bytes into a list of ints.
-
-    Each pair of bytes in the input is interpreted as one signed 16-bit
-    integer (range -32768 to 32767).
     """
 
     def standardize(self, raw: bytes) -> List[int]:

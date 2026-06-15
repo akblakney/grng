@@ -1,8 +1,35 @@
 """Entropy source backed by a microphone via PyAudio."""
 
+import os
+import sys
+
 import pyaudio
 
 from .base import EntropySource
+
+
+def _suppress_stderr():
+    """Context manager that redirects the C-level stderr fd to /dev/null.
+
+    PyAudio's underlying ALSA/JACK libraries print diagnostic messages
+    directly to the process's stderr file descriptor (not via Python's
+    sys.stderr), so they must be suppressed at the fd level.
+    """
+
+    class _Suppressor:
+        def __enter__(self):
+            self._stderr_fd = sys.stderr.fileno()
+            self._saved_fd = os.dup(self._stderr_fd)
+            self._devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(self._devnull, self._stderr_fd)
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            os.dup2(self._saved_fd, self._stderr_fd)
+            os.close(self._devnull)
+            os.close(self._saved_fd)
+
+    return _Suppressor()
 
 
 class MicrophoneSource(EntropySource):
@@ -30,15 +57,16 @@ class MicrophoneSource(EntropySource):
         self._stream = None
 
     def open(self) -> None:
-        self._pa = pyaudio.PyAudio()
-        self._stream = self._pa.open(
-            format=self.format,
-            channels=self.channels,
-            rate=self.rate,
-            input=True,
-            input_device_index=self.input_device_index,
-            frames_per_buffer=self.chunk_size,
-        )
+        with _suppress_stderr():
+            self._pa = pyaudio.PyAudio()
+            self._stream = self._pa.open(
+                format=self.format,
+                channels=self.channels,
+                rate=self.rate,
+                input=True,
+                input_device_index=self.input_device_index,
+                frames_per_buffer=self.chunk_size,
+            )
 
     def read_raw(self, num_chunks: int = 1) -> bytes:
         """Read `num_chunks` chunks of audio and return the raw bytes.
