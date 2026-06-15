@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grng"
+version = "0.1.0"
+description = "CLI for generating randomn numbers from various entropy sources"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyaudio",
+    "bitarray",
+]
+
+[project.optional-dependencies]
+dev = [
+    "matplotlib",
+]
+
+[project.scripts]
+grng = "grng.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
