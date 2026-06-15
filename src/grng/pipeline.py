@@ -4,6 +4,7 @@ from .extract.bits import BitExtractor
 from .extract.von_neumann import VonNeumannExtractor
 from .sources.base import EntropySource
 from .standardize.base import Standardizer
+from .validate.base import Validator
 
 
 class Pipeline:
@@ -22,11 +23,13 @@ class Pipeline:
         standardizer: Standardizer,
         bit_extractor: BitExtractor,
         von_neumann_extractor: VonNeumannExtractor,
+        validator: Validator = None
     ):
         self.source = source
         self.standardizer = standardizer
         self.bit_extractor = bit_extractor
         self.von_neumann_extractor = von_neumann_extractor
+        self.validator = validator
 
     def run(self, *source_args, **source_kwargs) -> bytearray:
         """Run the full pipeline and return the final random bytes.
@@ -38,5 +41,10 @@ class Pipeline:
             raw = self.source.read_raw(*source_args, **source_kwargs)
 
         values = self.standardizer.standardize(raw)
+
+        if self.validator is not None:
+            results = self.validator.run_all(raw, values)
+            self.validator.print_results(results)
+
         bits = self.bit_extractor.extract(values)
         return self.von_neumann_extractor.extract(bits)

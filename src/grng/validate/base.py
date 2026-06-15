@@ -1,6 +1,7 @@
 
 from abc import ABC
 from typing import Any, Dict, List
+import sys
 
 
 class Validator(ABC):
@@ -24,3 +25,11 @@ class Validator(ABC):
                 if callable(method):
                     results[name] = method(raw, values)
         return results
+
+    def print_results(self, results):
+        print("===== VALIDATION RESULTS =====")
+        for name, result in results.items():
+            if result is not None:
+                print(f"\n{name}:", file=sys.stderr)
+                print(result, file=sys.stderr)
+        print("==============================\n")
