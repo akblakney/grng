@@ -3,7 +3,6 @@
 from .extract.bits import BitExtractor
 from .extract.von_neumann import VonNeumannExtractor
 from .sources.base import EntropySource
-from .standardize.base import Standardizer
 from .validate.base import Validator
 
 
@@ -20,13 +19,11 @@ class Pipeline:
     def __init__(
         self,
         source: EntropySource,
-        standardizer: Standardizer,
         bit_extractor: BitExtractor,
         von_neumann_extractor: VonNeumannExtractor,
         validator: Validator = None
     ):
         self.source = source
-        self.standardizer = standardizer
         self.bit_extractor = bit_extractor
         self.von_neumann_extractor = von_neumann_extractor
         self.validator = validator
@@ -40,7 +37,7 @@ class Pipeline:
         with self.source:
             raw = self.source.read_raw(*source_args, **source_kwargs)
 
-        values = self.standardizer.standardize(raw)
+        values = self.source.standardize(raw)
 
         if self.validator is not None:
             results = self.validator.run_all(raw, values)

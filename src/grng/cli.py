@@ -7,15 +7,15 @@ from .extract.bits import LSBExtractor
 from .extract.von_neumann import VonNeumannExtractor
 from .pipeline import Pipeline
 from .sources.microphone import MicrophoneSource
-from .standardize.audio import AudioStandardizer
 from .validate.audio import AudioValidator
 
+from .constants.audio import SAMPLE_RATE
 
 # Registry mapping source names to (EntropySource factory, Standardizer factory,
 # Validator factory). Each factory is a zero-arg callable that constructs a
 # fresh instance.
 SOURCES = {
-    "audio": (MicrophoneSource, AudioStandardizer, AudioValidator),
+    "audio": (MicrophoneSource, AudioValidator),
 }
 
 
@@ -59,18 +59,6 @@ def build_parser() -> argparse.ArgumentParser:
     # Audio-specific options
     audio_group = parser.add_argument_group("audio source options")
     audio_group.add_argument(
-        "--rate",
-        type=int,
-        default=44100,
-        help="Audio sample rate in Hz (default: 44100).",
-    )
-    audio_group.add_argument(
-        "--channels",
-        type=int,
-        default=1,
-        help="Number of audio channels (default: 1).",
-    )
-    audio_group.add_argument(
         "--chunk-size",
         type=int,
         default=1024,
@@ -90,25 +78,20 @@ def build_parser() -> argparse.ArgumentParser:
 def build_pipeline(args: argparse.Namespace) -> Pipeline:
     bit_extractor = LSBExtractor(n=args.lsb_bits)
     von_neumann = VonNeumannExtractor()
-    validator = None
-    if args.validate:
-        validator = build_validator(args)
+    validator = build_validator(args) if args.validate else None
 
     if args.source == "audio":
         source = MicrophoneSource(
-            rate=args.rate,
-            channels=args.channels,
             chunk_size=args.chunk_size,
         )
-        standardizer = AudioStandardizer()
-        return Pipeline(source, standardizer, bit_extractor, von_neumann, validator=validator)
+        return Pipeline(source, bit_extractor, von_neumann, validator=validator)
 
     raise ValueError(f"Unknown source: {args.source}")
 
 
 def build_validator(args: argparse.Namespace):
     if args.source == "audio":
-        return AudioValidator(sample_rate=args.rate)
+        return AudioValidator(SAMPLE_RATE)
 
     raise ValueError(f"Unknown source: {args.source}")
 

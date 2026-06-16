@@ -1,7 +1,7 @@
 """Base class for entropy sources."""
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, List
 
 
 " Abstract base class for a source that produces raw entropy data"
@@ -13,6 +13,10 @@ class EntropySource(ABC):
 
     @abstractmethod
     def read_raw(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def standardize(self, raw: Any) -> List[int]:
         raise NotImplementedError
 
     @abstractmethod

@@ -2,18 +2,18 @@
 
 import os
 import sys
+import struct
 
 import pyaudio
+
+from typing import List
 
 from .base import EntropySource
 
 
 def _suppress_stderr():
-    """Context manager that redirects the C-level stderr fd to /dev/null.
-
-    PyAudio's underlying ALSA/JACK libraries print diagnostic messages
-    directly to the process's stderr file descriptor (not via Python's
-    sys.stderr), so they must be suppressed at the fd level.
+    """
+    Supress pyaudio logs
     """
 
     class _Suppressor:
@@ -81,6 +81,15 @@ class MicrophoneSource(EntropySource):
         for _ in range(num_chunks):
             data.extend(self._stream.read(self.chunk_size, exception_on_overflow=False))
         return bytes(data)
+
+    def standardize(self, raw: bytes) -> List[int]:
+        if len(raw) % 2 != 0:
+            raise ValueError(
+                f"Raw audio data length must be a multiple of 2 bytes, got {len(raw)}"
+            )
+
+        num_samples = len(raw) // 2
+        return list(struct.unpack(f"<{num_samples}h", raw))
 
     def close(self) -> None:
         if self._stream is not None:
