@@ -11,7 +11,7 @@ class Pipeline:
 
     The pipeline runs the following stages in order:
         1. EntropySource.read_raw()      -> raw source data
-        2. Standardizer.standardize()    -> List[int]
+        2. .standardize()                -> List[int]
         3. BitExtractor.extract()        -> bitarray
         4. VonNeumannExtractor.extract() -> bytearray
     """
@@ -36,13 +36,10 @@ class Pipeline:
         """
         with self.source:
             raw = self.source.read_raw(*source_args, **source_kwargs)
-
         values = self.source.standardize(raw)
-
         if self.validator is not None:
             results = self.validator.run_all(raw, values)
-            self.validator.print_results(results)
-
+            self.validator.accumulate(raw, values)
         bits = self.bit_extractor.extract(values)
         return self.von_neumann_extractor.extract(bits)
 
@@ -55,10 +52,6 @@ class Pipeline:
         **source_kwargs,
     ) -> None:
         """Loop the pipeline until exactly n_bytes have been written to path.
-
-        Each iteration performs one source read, extracts bytes, and flushes
-        them to the file — keeping memory usage bounded to a single batch at
-        a time regardless of how large n_bytes is.
         """
         written = 0
         with open(path, "wb") as f:
@@ -67,10 +60,12 @@ class Pipeline:
                 if not batch:
                     continue
                 remaining = n_bytes - written
-                chunk = batch[:remaining]  # truncate final batch if needed
+                chunk = batch[:remaining]
                 f.write(chunk)
                 written += len(chunk)
                 if verbose:
                     print(f"{written} / {n_bytes} bytes written", file=sys.stderr)
+        if self.validator is not None:
+            self.validator.finalize()
         if verbose:
-            print(f"Done. {written} bytes written to {path}", file=sys.stderr)
+            print(f"Complete. {written} bytes written to {path}", file=sys.stderr)

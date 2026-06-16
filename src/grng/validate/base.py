@@ -1,7 +1,8 @@
-
+"""Base class for validators."""
+import json
+import sys
 from abc import ABC
 from typing import Any, Dict, List
-import sys
 
 
 class Validator(ABC):
@@ -9,12 +10,13 @@ class Validator(ABC):
 
     Subclasses implement one or more `check_*` methods, each taking
     `raw` (the source's native raw data) and `values` (the standardized
-    `List[int]`). Each check performs some validation action — e.g.
-    producing a plot, or computing statistics — and may return a result
-    (or `None` if its purpose is purely a side effect like plotting).
+    `List[int]`). Each check performs some validation action
 
     `run_all` discovers and runs every `check_*` method defined on the
     instance, returning a dict mapping method name to its result.
+
+    `accumulate` is called each batch to update running state.
+    `finalize` is called once after all batches to report cumulative results.
     """
 
     def run_all(self, raw: Any, values: List[int]) -> Dict[str, Any]:
@@ -26,10 +28,18 @@ class Validator(ABC):
                     results[name] = method(raw, values)
         return results
 
-    def print_results(self, results):
-        print("===== VALIDATION RESULTS =====")
+    def print_results(self, results: Dict[str, Any]) -> None:
+        print("===== VALIDATION RESULTS =====", file=sys.stderr)
         for name, result in results.items():
             if result is not None:
                 print(f"\n{name}:", file=sys.stderr)
-                print(result, file=sys.stderr)
-        print("==============================\n")
+                print(json.dumps(result, indent=2), file=sys.stderr)
+        print("==============================\n", file=sys.stderr)
+
+    def accumulate(self, raw: Any, values: List[int]) -> None:
+        """Accumulate state across batches. Override in subclasses."""
+        pass
+
+    def finalize(self) -> None:
+        """Compute and print cumulative results. Called once after all batches."""
+        pass
