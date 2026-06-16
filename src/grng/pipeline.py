@@ -1,5 +1,7 @@
 """Pipeline that composes an entropy source through to final random bytes."""
 import sys
+import time
+
 from .extract.bits import BitExtractor
 from .extract.von_neumann import VonNeumannExtractor
 from .sources.base import EntropySource
@@ -54,6 +56,7 @@ class Pipeline:
         """Loop the pipeline until exactly n_bytes have been written to path.
         """
         written = 0
+        start_time = time.time()
         with open(path, "wb") as f:
             while written < n_bytes:
                 batch = self.run(*source_args, **source_kwargs)
@@ -63,9 +66,12 @@ class Pipeline:
                 chunk = batch[:remaining]
                 f.write(chunk)
                 written += len(chunk)
+                elapsed_time = time.time() - start_time
                 if verbose:
-                    print(f"{written} / {n_bytes} bytes written", file=sys.stderr)
+                    msg = f"{written} / {n_bytes} bytes written in {elapsed_time:.2f} seconds"
+                    print(f"\r{msg:<50}", end="", file=sys.stderr)
+
         if self.validator is not None:
             self.validator.finalize()
         if verbose:
-            print(f"Complete. {written} bytes written to {path}", file=sys.stderr)
+            print(f"Complete. {written} bytes written to {path} in {elapsed_time:.2f} seconds", file=sys.stderr)
