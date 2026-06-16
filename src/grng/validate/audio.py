@@ -23,8 +23,11 @@ class AudioValidator(Validator):
     def __init__(self, sample_rate: int = 44100, n_bits: int = 4):
         self.sample_rate = sample_rate
         self.n_bits = n_bits
+        self.has_plotted = False
 
     def check_waveform_plot(self, raw: bytes, values: List[int]) -> None:
+        if self.has_plotted:
+            return
         times = [i / self.sample_rate for i in range(len(values))]
 
         plt.figure(figsize=(12, 4))
@@ -34,6 +37,7 @@ class AudioValidator(Validator):
         plt.title("Audio waveform (standardized values)")
         plt.tight_layout()
         plt.show()
+        self.has_plotted = True
 
     def check_low_bits_uniformity(self, raw: bytes, values: List[int]) -> Dict[str, Any]:
         num_bins = 1 << self.n_bits

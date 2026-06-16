@@ -9,6 +9,7 @@ import pyaudio
 from typing import List
 
 from .base import EntropySource
+from ..constants.audio import SAMPLE_RATE, CHUNK_SIZE
 
 
 def _suppress_stderr():
@@ -42,9 +43,9 @@ class MicrophoneSource(EntropySource):
 
     def __init__(
         self,
-        rate: int = 44100,
+        rate: int = SAMPLE_RATE,
         channels: int = 1,
-        chunk_size: int = 1024,
+        chunk_size: int = CHUNK_SIZE,
         input_device_index: int | None = None,
     ) -> None:
         self.rate = rate

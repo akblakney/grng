@@ -1,5 +1,5 @@
 """Pipeline that composes an entropy source through to final random bytes."""
-
+import sys
 from .extract.bits import BitExtractor
 from .extract.von_neumann import VonNeumannExtractor
 from .sources.base import EntropySource
@@ -21,7 +21,7 @@ class Pipeline:
         source: EntropySource,
         bit_extractor: BitExtractor,
         von_neumann_extractor: VonNeumannExtractor,
-        validator: Validator = None
+        validator: Validator = None,
     ):
         self.source = source
         self.bit_extractor = bit_extractor
@@ -29,7 +29,7 @@ class Pipeline:
         self.validator = validator
 
     def run(self, *source_args, **source_kwargs) -> bytearray:
-        """Run the full pipeline and return the final random bytes.
+        """Run one pass through the pipeline and return the resulting bytes.
 
         Any positional/keyword arguments are forwarded to
         `source.read_raw()` (e.g. number of chunks to read).
@@ -45,3 +45,32 @@ class Pipeline:
 
         bits = self.bit_extractor.extract(values)
         return self.von_neumann_extractor.extract(bits)
+
+    def run_to_file(
+        self,
+        path: str,
+        n_bytes: int,
+        verbose: bool = False,
+        *source_args,
+        **source_kwargs,
+    ) -> None:
+        """Loop the pipeline until exactly n_bytes have been written to path.
+
+        Each iteration performs one source read, extracts bytes, and flushes
+        them to the file — keeping memory usage bounded to a single batch at
+        a time regardless of how large n_bytes is.
+        """
+        written = 0
+        with open(path, "wb") as f:
+            while written < n_bytes:
+                batch = self.run(*source_args, **source_kwargs)
+                if not batch:
+                    continue
+                remaining = n_bytes - written
+                chunk = batch[:remaining]  # truncate final batch if needed
+                f.write(chunk)
+                written += len(chunk)
+                if verbose:
+                    print(f"{written} / {n_bytes} bytes written", file=sys.stderr)
+        if verbose:
+            print(f"Done. {written} bytes written to {path}", file=sys.stderr)
