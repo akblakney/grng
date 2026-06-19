@@ -17,22 +17,28 @@ class VonNeumannExtractor:
     """
 
     def __init__(self):
-        pass
+        self.pairs_processed = 0
+        self.pairs_discarded = 0
+        self.pairs_output = 0
 
     def extract(self, bits: bitarray) -> bytearray:
         output_bits = bitarray()
 
         # Process bits in pairs; ignore a trailing odd bit if present.
         num_pairs = len(bits) // 2
+        self.pairs_processed += num_pairs
         for i in range(num_pairs):
             first = bits[2 * i]
             second = bits[2 * i + 1]
 
             if first == second:
+                self.pairs_discarded += 1
                 continue  # discard 00 or 11
             elif first == 0 and second == 1:
+                self.pairs_output += 1
                 output_bits.append(0)
             elif first == 1 and second == 0:
+                self.pairs_output += 1
                 output_bits.append(1)
             else:
                 raise ValueError('invalid bit value {} {}'.format(first, second))

@@ -75,3 +75,5 @@ class Pipeline:
             self.validator.finalize()
         if verbose:
             print(f"Complete. {written} bytes written to {path} in {elapsed_time:.2f} seconds", file=sys.stderr)
+            vn = self.von_neumann_extractor
+            print('Processed {} total pairs of bits. Kept {} and discarded {}'.format(vn.pairs_processed, vn.pairs_output, vn.pairs_discarded))
