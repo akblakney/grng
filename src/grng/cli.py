@@ -63,6 +63,14 @@ def build_parser() -> argparse.ArgumentParser:
              "generating output.",
     )
     parser.add_argument(
+        "--format",
+        type=str,
+        choices=["binary", "hex"],
+        default="binary",
+        dest="fmt",
+        help="Output format: binary (default) or hex.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print progress updates to stderr during generation.",
@@ -90,7 +98,7 @@ def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     pipeline = build_pipeline(args)
-    pipeline.run_to_file(args.output, args.n_bytes, verbose=args.verbose)
+    pipeline.run_to_file(args.output, args.n_bytes, verbose=args.verbose, fmt=args.fmt)
     return 0
 
 

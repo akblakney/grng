@@ -51,6 +51,7 @@ class Pipeline:
         path: str | None,
         n_bytes: int,
         verbose: bool = False,
+        fmt: str = "binary",
         *source_args,
         **source_kwargs,
     ) -> None:
@@ -65,7 +66,7 @@ class Pipeline:
                     continue
                 remaining = n_bytes - written
                 chunk = batch[:remaining]
-                f.write(chunk)
+                f.write(self._encode(chunk, fmt))
                 written += len(chunk)
                 elapsed_time = time.time() - start_time
                 if verbose:
@@ -89,3 +90,11 @@ class Pipeline:
                 yield f
             finally:
                 f.close()
+
+    @staticmethod
+    def _encode(chunk: bytearray, fmt: str) -> bytes:
+        if fmt == "binary":
+            return bytes(chunk)
+        elif fmt == "hex":
+            return chunk.hex().encode("ascii")
+        raise ValueError(f"Unknown format: {fmt}")
