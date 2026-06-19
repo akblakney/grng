@@ -1,6 +1,7 @@
 """Pipeline that composes an entropy source through to final random bytes."""
 import sys
 import time
+import contextlib
 
 from .extract.bits import BitExtractor
 from .extract.von_neumann import VonNeumannExtractor
@@ -47,7 +48,7 @@ class Pipeline:
 
     def run_to_file(
         self,
-        path: str,
+        path: str | None,
         n_bytes: int,
         verbose: bool = False,
         *source_args,
@@ -57,7 +58,7 @@ class Pipeline:
         """
         written = 0
         start_time = time.time()
-        with open(path, "wb") as f:
+        with self._open_output(path) as f:
             while written < n_bytes:
                 batch = self.run(*source_args, **source_kwargs)
                 if not batch:
@@ -77,3 +78,14 @@ class Pipeline:
             print(f"Complete. {written} bytes written to {path} in {elapsed_time:.2f} seconds", file=sys.stderr)
             vn = self.von_neumann_extractor
             print('Processed {} total pairs of bits. Kept {} and discarded {}'.format(vn.pairs_processed, vn.pairs_output, vn.pairs_discarded), file=sys.stderr)
+
+    @contextlib.contextmanager
+    def _open_output(self, path: str | None):
+        if path is None:
+            yield sys.stdout.buffer
+        else:
+            f = open(path, "wb")
+            try:
+                yield f
+            finally:
+                f.close()

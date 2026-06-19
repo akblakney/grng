@@ -38,9 +38,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=str,
-        required=True,
+        default=None,
         metavar="FILE",
-        help="File to write the output bytes to.",
+        help="File to write the output bytes to. If none provided, write to stdout.",
     )
     parser.add_argument(
         "--lsb-bits",
