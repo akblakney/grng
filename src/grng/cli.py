@@ -51,6 +51,12 @@ def build_parser() -> argparse.ArgumentParser:
              "standardized value (default: 1).",
     )
     parser.add_argument(
+        "--interval",
+        type=int,
+        default=1,
+        help="interval between each value to be extracted"
+    )
+    parser.add_argument(
         "--validate",
         action="store_true",
         help="Run validation checks on the raw/standardized data before "
@@ -65,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_pipeline(args: argparse.Namespace) -> Pipeline:
-    bit_extractor = LSBExtractor(n=args.lsb_bits)
+    bit_extractor = LSBExtractor(lsb_bits=args.lsb_bits, interval=args.interval)
     von_neumann = VonNeumannExtractor()
     validator = build_validator(args) if args.validate else None
     if args.source == "audio":

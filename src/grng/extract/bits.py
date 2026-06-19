@@ -16,25 +16,28 @@ class BitExtractor(ABC):
 
 
 class LSBExtractor(BitExtractor):
-    """Extracts the lowest `n` bits of each integer value.
+    """Extracts the lowest `lsb_bits` bits of each integer value.
 
-    For each value, the n least-significant bits are taken (using the
+    For each value, the lsb_bits least-significant bits are taken (using the
     value's two's-complement bit pattern for negative numbers) and
-    appended to the output bitarray, most-significant of the n bits first.
+    appended to the output bitarray, most-significant of the lsb_bits bits first.
     """
 
-    def __init__(self, n: int = 1):
-        if n < 1:
-            raise ValueError(f"n must be >= 1, got {n}")
-        self.n = n
+    def __init__(self, lsb_bits: int = 1, interval: int = 1):
+        if lsb_bits < 1:
+            raise ValueError(f"lsb_bits must be >= 1, got {lsb_bits}")
+        if interval < 1:
+            raise ValueError(f"interval must be >= 1, got {interval}")
+        self.lsb_bits = lsb_bits
+        self.interval = interval
 
     def extract(self, values: List[int]) -> bitarray:
         bits = bitarray()
-        mask = (1 << self.n) - 1 # mask with n lowest bits
+        mask = (1 << self.lsb_bits) - 1 # mask with lsb_bits lowest bits
 
-        for value in values:
-            low_bits = value & mask
-            for i in range(self.n - 1, -1, -1):
-                bits.append((low_bits >> i) & 1)
+        for i in range(0, len(values), self.interval):
+            low_bits = values[i] & mask
+            for j in range(self.lsb_bits - 1, -1, -1):
+                bits.append((low_bits >> j) & 1)
 
         return bits
