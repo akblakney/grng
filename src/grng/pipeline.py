@@ -60,12 +60,14 @@ class Pipeline:
         written = 0
         start_time = time.time()
         with self._open_output(path) as f:
-            while written < n_bytes:
+            while self.loop_condition(n_bytes, written):
                 batch = self.run(*source_args, **source_kwargs)
                 if not batch:
                     continue
-                remaining = n_bytes - written
-                chunk = batch[:remaining]
+                chunk = batch
+                if n_bytes:
+                    remaining = n_bytes - written
+                    chunk = batch[:remaining]
                 f.write(self._encode(chunk, fmt))
                 written += len(chunk)
                 elapsed_time = time.time() - start_time
@@ -98,3 +100,9 @@ class Pipeline:
         elif fmt == "hex":
             return chunk.hex().encode("ascii")
         raise ValueError(f"Unknown format: {fmt}")
+
+    @staticmethod
+    def loop_condition(n_bytes: int | None, written: int) -> bool:
+        if n_bytes:
+            return written < n_bytes
+        return True
