@@ -58,9 +58,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validate",
-        action="store_true",
-        help="Run validation checks on the raw/standardized data before "
-             "generating output.",
+        nargs="?",
+        const=1.0,
+        default=None,
+        type=float,
+        metavar="RATE",
+        help="Run validation checks on the raw/standardized data. Optionally "
+            "specify a sampling rate between 0 and 1 (e.g. 0.1 to run 10%% "
+            "of the time). If omitted entirely, validation is disabled. "
+            "If passed without a value, validation runs every iteration.",
     )
     parser.add_argument(
         "--format",
@@ -90,7 +96,7 @@ def build_pipeline(args: argparse.Namespace) -> Pipeline:
 
 def build_validator(args: argparse.Namespace):
     if args.source == "audio":
-        return AudioValidator(SAMPLE_RATE)
+        return AudioValidator(SAMPLE_RATE, thresh=args.validate)
     raise ValueError(f"Unknown source: {args.source}")
 
 

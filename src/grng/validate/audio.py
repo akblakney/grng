@@ -3,6 +3,7 @@ import json
 import sys
 from collections import Counter
 from typing import Any, Dict, List
+import numpy as np
 
 import matplotlib.pyplot as plt
 from scipy.stats import chi2
@@ -14,12 +15,13 @@ class AudioValidator(Validator):
     """Validation checks for audio entropy data.
     """
 
-    def __init__(self, sample_rate: int = 44100, n_bits: int = 4):
+    def __init__(self, sample_rate: int = 44100, n_bits: int = 4, thresh: int = 1.0):
         self.sample_rate = sample_rate
         self.n_bits = n_bits
         self.has_plotted = False
         self._counts = Counter()
         self._total_values = 0
+        self.thresh = thresh
 
     def check_waveform_plot(self, raw: bytes, values: List[int]) -> None:
         if self.has_plotted:
@@ -61,3 +63,19 @@ class AudioValidator(Validator):
         print("\n===== LOW BITS UNIFORMITY (cumulative) =====", file=sys.stderr)
         print(json.dumps(result, indent=2), file=sys.stderr)
         print("=============================================\n", file=sys.stderr)
+    
+    def check_lsb_autocorrelation(self, raw: bytes, values: List[int]) -> Dict[str, Any]:
+        # Extract LSB stream as +1/-1 (zero-mean) for standard autocorrelation
+        bits = np.array([(v & 1) * 2 - 1 for v in values], dtype=float)
+
+        n = len(bits)
+        variance = np.var(bits)
+
+        lags = [2**i for i in range(11)]  # 1, 2, 4, ..., 1024
+        autocorr = {
+            lag: round(float(np.mean(bits[:n - lag] * bits[lag:]) / variance), 4)
+            for lag in lags
+            if lag < n
+        }
+
+        return {"lsb_autocorrelation": autocorr}

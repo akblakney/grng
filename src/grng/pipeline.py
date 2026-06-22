@@ -2,6 +2,7 @@
 import sys
 import time
 import contextlib
+import random
 
 from .extract.bits import BitExtractor
 from .extract.von_neumann import VonNeumannExtractor
@@ -31,6 +32,11 @@ class Pipeline:
         self.von_neumann_extractor = von_neumann_extractor
         self.validator = validator
 
+    def run_validation(self) -> bool:
+        if self.validator is None:
+            return False
+        return random.random() < self.validator.thresh
+
     def run(self, *source_args, **source_kwargs) -> bytearray:
         """Run one pass through the pipeline and return the resulting bytes.
 
@@ -40,9 +46,10 @@ class Pipeline:
         with self.source:
             raw = self.source.read_raw(*source_args, **source_kwargs)
         values = self.source.standardize(raw)
-        if self.validator is not None:
+        if self.run_validation():
             results = self.validator.run_all(raw, values)
             self.validator.accumulate(raw, values)
+            self.validator.print_results(results)
         bits = self.bit_extractor.extract(values)
         return self.von_neumann_extractor.extract(bits)
 
