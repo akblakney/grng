@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--bytes",
         type=int,
-        default=None,
+        required=True,
         metavar="N",
         dest="n_bytes",
         help="Number of random bytes to generate.",

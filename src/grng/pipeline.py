@@ -3,7 +3,7 @@ import sys
 import time
 import contextlib
 import random
-
+from datetime import datetime, timezone
 from .extract.bits import BitExtractor
 from .extract.von_neumann import VonNeumannExtractor
 from .sources.base import EntropySource
@@ -56,45 +56,89 @@ class Pipeline:
     def run_to_file(
         self,
         path: str | None,
-        n_bytes: int,
+        n_bytes: int | None = None,
+        deadline: float | None = None,
         verbose: bool = False,
         fmt: str = "binary",
         *source_args,
         **source_kwargs,
-    ) -> None:
-        """Loop the pipeline until exactly n_bytes have been written to path.
+    ) -> int:
+        """Loop the pipeline, writing to path, until a stop condition is met.
+
+        Exactly one of n_bytes or deadline must be provided:
+            n_bytes:  stop after exactly this many bytes are written.
+            deadline: stop after this monotonic time (from time.monotonic())
+                      is reached. Use make_deadline() to construct one.
+
+        Returns the number of bytes written.
         """
+        assert (n_bytes is None) != (deadline is None), \
+            "Exactly one of n_bytes or deadline must be provided"
+
         written = 0
         start_time = time.time()
-        with self._open_output(path) as f:
-            while self.loop_condition(n_bytes, written):
+        with self._open_output(path, fmt) as f:
+            while self._should_continue(n_bytes, deadline, written):
                 batch = self.run(*source_args, **source_kwargs)
                 if not batch:
                     continue
                 chunk = batch
-                if n_bytes:
+                if n_bytes is not None:
                     remaining = n_bytes - written
                     chunk = batch[:remaining]
                 f.write(self._encode(chunk, fmt))
                 written += len(chunk)
-                elapsed_time = time.time() - start_time
+                elapsed = time.time() - start_time
                 if verbose:
-                    msg = f"{written} / {n_bytes} bytes written in {elapsed_time:.2f} seconds"
-                    print(f"\r{msg:<50}", end="", file=sys.stderr)
+                    if n_bytes is not None:
+                        msg = f"{written} / {n_bytes} bytes written in {elapsed:.2f}s"
+                    else:
+                        msg = f"{written} bytes written in {elapsed:.2f}s"
+                    print(f"\r{msg:<60}", end="", file=sys.stderr)
 
         if self.validator is not None:
             self.validator.finalize()
         if verbose:
-            print(f"Complete. {written} bytes written to {path} in {elapsed_time:.2f} seconds", file=sys.stderr)
+            elapsed = time.time() - start_time
+            print(file=sys.stderr)
+            print(f"Complete. {written} bytes written to {path} in {elapsed:.2f}s", file=sys.stderr)
             vn = self.von_neumann_extractor
-            print('Processed {} total pairs of bits. Kept {} and discarded {}'.format(vn.pairs_processed, vn.pairs_output, vn.pairs_discarded), file=sys.stderr)
+            print(
+                f"Processed {vn.pairs_processed} total pairs. "
+                f"Kept {vn.pairs_output}, discarded {vn.pairs_discarded}.",
+                file=sys.stderr,
+            )
+        return written
+
+    @staticmethod
+    def make_deadline(seconds: float) -> float:
+        """Return a monotonic deadline that expires in `seconds` from now."""
+        return time.monotonic() + seconds
+
+    @staticmethod
+    def seconds_until_next_utc_hour() -> float:
+        """Return the number of seconds until the next UTC hour boundary."""
+        now = datetime.now(timezone.utc)
+        seconds_into_hour = now.minute * 60 + now.second + now.microsecond / 1e6
+        return 3600.0 - seconds_into_hour
+
+    @staticmethod
+    def _should_continue(
+        n_bytes: int | None,
+        deadline: float | None,
+        written: int,
+    ) -> bool:
+        if n_bytes is not None:
+            return written < n_bytes
+        return time.monotonic() < deadline
 
     @contextlib.contextmanager
-    def _open_output(self, path: str | None):
+    def _open_output(self, path: str | None, fmt: str = "binary"):
         if path is None:
-            yield sys.stdout.buffer
+            yield sys.stdout.buffer if fmt == "binary" else sys.stdout
         else:
-            f = open(path, "wb")
+            mode = "wb" if fmt == "binary" else "w"
+            f = open(path, mode)
             try:
                 yield f
             finally:
@@ -107,9 +151,3 @@ class Pipeline:
         elif fmt == "hex":
             return chunk.hex().encode("ascii")
         raise ValueError(f"Unknown format: {fmt}")
-
-    @staticmethod
-    def loop_condition(n_bytes: int | None, written: int) -> bool:
-        if n_bytes:
-            return written < n_bytes
-        return True
