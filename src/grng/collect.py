@@ -125,26 +125,6 @@ def write_meta(
 
 def write_validation(paths: dict, validator: AudioValidator) -> None:
     data = validator.to_dict()
-    if not data:
-        return
-    # Merge with existing validation file if present (resume case)
-    if os.path.exists(paths["validation"]):
-        try:
-            with open(paths["validation"]) as f:
-                existing = json.load(f)
-            # Add accumulated counts from previous run
-            prev_counts = existing.get("counts", {})
-            curr_counts = data.get("counts", {})
-            merged_counts = {
-                str(k): prev_counts.get(str(k), 0) + curr_counts.get(str(k), 0)
-                for k in set(list(prev_counts.keys()) + list(curr_counts.keys()))
-            }
-            data["counts"] = merged_counts
-            data["total_values"] = (
-                existing.get("total_values", 0) + data.get("total_values", 0)
-            )
-        except (json.JSONDecodeError, KeyError):
-            pass  # corrupted file — just overwrite
     with open(paths["validation"], "w") as f:
         json.dump(data, f, indent=2)
 
