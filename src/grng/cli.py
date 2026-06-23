@@ -70,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--plot",
-        type=bool,
+        action="store_true",
         default=False,
         help="Plot raw audio values"
     )
