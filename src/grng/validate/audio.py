@@ -5,7 +5,6 @@ from collections import Counter
 from typing import Any, Dict, List
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.stats import chi2
 
 from .base import Validator
@@ -26,6 +25,7 @@ class AudioValidator(Validator):
     def check_waveform_plot(self, raw: bytes, values: List[int]) -> None:
         if self.has_plotted or not self.plot:
             return
+        import matplotlib.pyplot as plt
         times = [i / self.sample_rate for i in range(len(values))]
         plt.figure(figsize=(12, 4))
         plt.plot(times, values, linewidth=0.5)

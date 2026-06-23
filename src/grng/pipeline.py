@@ -49,7 +49,7 @@ class Pipeline:
         if self.run_validation():
             results = self.validator.run_all(raw, values)
             self.validator.accumulate(raw, values)
-            self.validator.print_results(results)
+            #self.validator.print_results(results)
         bits = self.bit_extractor.extract(values)
         return self.von_neumann_extractor.extract(bits)
 
