@@ -21,6 +21,7 @@ dev = [
 
 [project.scripts]
 grng = "grng.cli:main"
+grng-collect = "grng.collect:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

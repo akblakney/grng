@@ -80,3 +80,30 @@ class AudioValidator(Validator):
         }
 
         return {"lsb_autocorrelation": autocorr}
+
+    def reset(self) -> None:
+        self._counts = Counter()
+        self._total_values = 0
+        self.has_plotted = False
+
+    def to_dict(self) -> dict:
+        if self._total_values == 0:
+            return {}
+        num_bins = 1 << self.n_bits
+        expected = self._total_values / num_bins
+        chi_square = sum(
+            (self._counts.get(i, 0) - expected) ** 2 / expected
+            for i in range(num_bins)
+        )
+        degrees_of_freedom = num_bins - 1
+        p_value = float(chi2.sf(chi_square, degrees_of_freedom))
+        return {
+            "n_bits": self.n_bits,
+            "num_bins": num_bins,
+            "total_values": self._total_values,
+            "counts": dict(sorted(self._counts.items())),
+            "expected_per_bin": round(expected, 2),
+            "chi_square": round(chi_square, 4),
+            "degrees_of_freedom": degrees_of_freedom,
+            "p_value": round(p_value, 4),
+        }

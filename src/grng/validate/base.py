@@ -43,3 +43,11 @@ class Validator(ABC):
     def finalize(self) -> None:
         """Compute and print cumulative results. Called once after all batches."""
         pass
+
+    def reset(self) -> None:
+        """Reset accumulated state"""
+        pass
+
+    def to_dict(self) -> dict:
+        """Serialize cumulative validation results to a dict for file storage."""
+        return {}
