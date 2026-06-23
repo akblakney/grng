@@ -60,6 +60,7 @@ class Pipeline:
         deadline: float | None = None,
         verbose: bool = False,
         fmt: str = "binary",
+        file_mode: str = "wb",
         *source_args,
         **source_kwargs,
     ) -> int:
@@ -77,7 +78,7 @@ class Pipeline:
 
         written = 0
         start_time = time.time()
-        with self._open_output(path, fmt) as f:
+        with self._open_output(path, fmt, file_mode) as f:
             while self._should_continue(n_bytes, deadline, written):
                 batch = self.run(*source_args, **source_kwargs)
                 if not batch:
@@ -133,12 +134,13 @@ class Pipeline:
         return time.monotonic() < deadline
 
     @contextlib.contextmanager
-    def _open_output(self, path: str | None, fmt: str = "binary"):
+    def _open_output(self, path: str | None, fmt: str = "binary", file_mode: str = "wb"):
+        if fmt == "hex":
+            file_mode = "w"
         if path is None:
             yield sys.stdout.buffer if fmt == "binary" else sys.stdout
         else:
-            mode = "wb" if fmt == "binary" else "w"
-            f = open(path, mode)
+            f = open(path, file_mode)
             try:
                 yield f
             finally:

@@ -70,6 +70,30 @@ def compute_sha256(path: str) -> str:
             h.update(block)
     return h.hexdigest()
 
+def write_preliminary_meta(
+    paths: dict,
+    hour_start: datetime,
+    existing_bytes: int,
+    args: argparse.Namespace,
+    resume_count: int,
+) -> None:
+    meta = {
+        "source": args.source,
+        "hour_start_utc": hour_start.isoformat(),
+        "hour_end_utc": None,
+        "bytes_written": existing_bytes,  # reflects .bin size at start of this run
+        "sha256": None,
+        "resume_count": resume_count,
+        "complete": False,
+        "partial_start": resume_count == 0 and hour_start.minute != 0,
+        "params": {
+            "lsb_bits": args.lsb_bits,
+            "interval": args.interval,
+            "validate": args.validate,
+        },
+    }
+    with open(paths["meta"], "w") as f:
+        json.dump(meta, f, indent=2)
 
 def write_meta(
     paths: dict,
@@ -87,6 +111,7 @@ def write_meta(
         "bytes_written": bytes_written,
         "sha256": sha256,
         "resume_count": resume_count,
+        "complete": True,
         "partial_start": resume_count == 0 and hour_start.minute != 0,
         "params": {
             "lsb_bits": args.lsb_bits,
@@ -142,15 +167,27 @@ def log(paths: dict, message: str) -> None:
 # ---------------------------------------------------------------------------
 
 def load_resume_state(paths: dict) -> tuple[int, int]:
-    """Return (existing_byte_count, resume_count) from meta file if present."""
-    if not os.path.exists(paths["meta"]):
-        return 0, 0
-    try:
-        with open(paths["meta"]) as f:
-            meta = json.load(f)
-        return meta.get("bytes_written", 0), meta.get("resume_count", 0) + 1
-    except (json.JSONDecodeError, KeyError):
-        return 0, 0
+    """Return (existing_byte_count, resume_count) by inspecting the .bin file.
+
+    The .bin file size is the ground truth — it reflects exactly how many
+    bytes were written regardless of when the process was interrupted.
+    The resume_count is read from meta if available.
+    """
+    existing_bytes = 0
+    resume_count = 0
+
+    if os.path.exists(paths["bin"]):
+        existing_bytes = os.path.getsize(paths["bin"])
+
+    if existing_bytes > 0 and os.path.exists(paths["meta"]):
+        try:
+            with open(paths["meta"]) as f:
+                meta = json.load(f)
+            resume_count = meta.get("resume_count", 0) + 1
+        except (json.JSONDecodeError, KeyError):
+            resume_count = 1  # meta corrupted but .bin exists — still a resume
+
+    return existing_bytes, resume_count
 
 
 # ---------------------------------------------------------------------------
@@ -183,31 +220,34 @@ def collect_hour(
     deadline: float,
     args: argparse.Namespace,
 ) -> None:
-    """Run the pipeline for one hour and write all output files."""
     existing_bytes, resume_count = load_resume_state(paths)
 
-    if resume_count > 0:
+    if existing_bytes > 0:
         log(paths, f"Resuming hour {hour_start.strftime('%H')} "
                    f"(resume #{resume_count}, {existing_bytes} bytes already written)")
     else:
         log(paths, f"Starting hour {hour_start.strftime('%H')} UTC")
 
-    # Reset validator for fresh accumulation this run
+    # Write preliminary meta before we start so interrupts are detectable
+    write_preliminary_meta(paths, hour_start, existing_bytes, args, resume_count)
+
     if pipeline.validator is not None:
         pipeline.validator.reset()
 
+    # Append to existing .bin file on resume, otherwise overwrite
+    bin_mode = "ab"
     bytes_written_this_run = pipeline.run_to_file(
         paths["bin"],
         deadline=deadline,
         fmt="binary",
+        file_mode=bin_mode,
     )
 
     total_bytes = existing_bytes + bytes_written_this_run
     hour_end = datetime.now(timezone.utc)
 
     write_meta(paths, hour_start, hour_end, total_bytes, args, resume_count)
-    log(paths, f"Wrote meta: {total_bytes} bytes total, "
-               f"sha256 recomputed over full file")
+    log(paths, f"Wrote meta: {total_bytes} bytes total, sha256 recomputed over full file")
 
     if pipeline.validator is not None:
         write_validation(paths, pipeline.validator)
