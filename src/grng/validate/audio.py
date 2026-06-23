@@ -15,16 +15,17 @@ class AudioValidator(Validator):
     """Validation checks for audio entropy data.
     """
 
-    def __init__(self, sample_rate: int = 44100, n_bits: int = 4, thresh: int = 1.0):
+    def __init__(self, sample_rate: int = 44100, n_bits: int = 4, thresh: int = 1.0, plot=False):
         self.sample_rate = sample_rate
         self.n_bits = n_bits
         self.has_plotted = False
         self._counts = Counter()
         self._total_values = 0
         self.thresh = thresh
+        self.plot = plot
 
     def check_waveform_plot(self, raw: bytes, values: List[int]) -> None:
-        if self.has_plotted:
+        if self.has_plotted or not self.plot:
             return
         times = [i / self.sample_rate for i in range(len(values))]
         plt.figure(figsize=(12, 4))

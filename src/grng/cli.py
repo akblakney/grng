@@ -69,6 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
             "If passed without a value, validation runs every iteration.",
     )
     parser.add_argument(
+        "--plot",
+        type=bool,
+        default=False,
+        help="Plot raw audio values"
+    )
+    parser.add_argument(
         "--format",
         type=str,
         choices=["binary", "hex"],
@@ -96,7 +102,7 @@ def build_pipeline(args: argparse.Namespace) -> Pipeline:
 
 def build_validator(args: argparse.Namespace):
     if args.source == "audio":
-        return AudioValidator(SAMPLE_RATE, thresh=args.validate)
+        return AudioValidator(SAMPLE_RATE, thresh=args.validate, plot=args.plot)
     raise ValueError(f"Unknown source: {args.source}")
 
 
