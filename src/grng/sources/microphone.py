@@ -6,7 +6,7 @@ import struct
 
 import pyaudio
 
-from typing import List
+from typing import List, Optional
 
 from .base import EntropySource
 from ..constants.audio import SAMPLE_RATE, CHUNK_SIZE
@@ -46,7 +46,7 @@ class MicrophoneSource(EntropySource):
         rate: int = SAMPLE_RATE,
         channels: int = 1,
         chunk_size: int = CHUNK_SIZE,
-        input_device_index: int | None = None,
+        input_device_index: Optional[int] = None,
     ) -> None:
         self.rate = rate
         self.channels = channels
