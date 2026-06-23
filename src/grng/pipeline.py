@@ -151,5 +151,5 @@ class Pipeline:
         if fmt == "binary":
             return bytes(chunk)
         elif fmt == "hex":
-            return chunk.hex().encode("ascii")
+            return chunk.hex()
         raise ValueError(f"Unknown format: {fmt}")
