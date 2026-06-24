@@ -57,6 +57,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="interval between each value to be extracted"
     )
     parser.add_argument(
+        "--sample-rate",
+        type=int,
+        default=SAMPLE_RATE,
+        metavar="N",
+        help="Sample rate for audio sampling."
+    )
+    parser.add_argument(
         "--validate",
         nargs="?",
         const=1.0,
@@ -95,14 +102,14 @@ def build_pipeline(args: argparse.Namespace) -> Pipeline:
     von_neumann = VonNeumannExtractor()
     validator = build_validator(args) if args.validate else None
     if args.source == "audio":
-        source = MicrophoneSource()
+        source = MicrophoneSource(rate=args.sample_rate)
         return Pipeline(source, bit_extractor, von_neumann, validator=validator)
     raise ValueError(f"Unknown source: {args.source}")
 
 
 def build_validator(args: argparse.Namespace):
     if args.source == "audio":
-        return AudioValidator(SAMPLE_RATE, thresh=args.validate, plot=args.plot)
+        return AudioValidator(args.sample_rate, thresh=args.validate, plot=args.plot)
     raise ValueError(f"Unknown source: {args.source}")
 
 
