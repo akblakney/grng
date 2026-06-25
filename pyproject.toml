@@ -22,6 +22,7 @@ dev = [
 [project.scripts]
 grng = "grng.cli:main"
 grng-collect = "grng.collect:main"
+grng-collect-validate = "grng.collect_validate:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
