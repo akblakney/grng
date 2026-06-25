@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import chi2
 
 from .base import Validator
+from ..constants.audio import VALUES_VALIDATE_COUNT
 
 
 class AudioValidator(Validator):
@@ -21,6 +22,7 @@ class AudioValidator(Validator):
         self._counts = Counter()
         self._total_values = 0
         self._autocorr_results: list[Dict[str, Any]] = []
+        self.values_list: List[int] = []
 
     def check_waveform_plot(self, raw: bytes, values: List[int]) -> None:
         if self.has_plotted or not self.plot:
@@ -78,6 +80,7 @@ class AudioValidator(Validator):
                 "p_value": round(p_value, 4),
             },
             "autocorrelation_results": self._autocorr_results,
+            "values_results": self.values_list
         }
 
     
@@ -97,3 +100,10 @@ class AudioValidator(Validator):
             if lag < n
         }
         self._autocorr_results.append(autocorr)
+
+    def check_values(self, raw: bytes, values: List[int]) -> None:
+        """ Appends raw audio values to running list to write in validation file
+        Only read the first VALUES_VALIDATE_COUNT values
+        """
+        n = min(len(values), VALUES_VALIDATE_COUNT)
+        self.values_list.extend(values[:n])
