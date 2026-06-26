@@ -232,9 +232,8 @@ def summarize_day(data_dir: str, date_str: str) -> dict:
     }
 
 def plot_values(values: list[int], period: str) -> None:
-    """Plot values as a waveform and histogram side by side."""
+    """Plot raw 16-bit signed int values as a waveform and histogram."""
     import matplotlib.pyplot as plt
-    import numpy as np
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
     fig.suptitle(f"Values — {period}", fontsize=14)
@@ -242,19 +241,20 @@ def plot_values(values: list[int], period: str) -> None:
     # Waveform
     ax1.plot(values, linewidth=0.5)
     ax1.set_xlabel("Index")
-    ax1.set_ylabel("Value")
+    ax1.set_ylabel("Sample value")
+    ax1.set_ylim(-32768, 32767)
     ax1.set_title("Waveform")
 
     # Histogram
-    ax2.hist(values, bins=256, range=(0, 255), edgecolor="none")
+    ax2.hist(values, bins=1024, range=(-32768, 32767), edgecolor="none")
     ax2.axhline(
-        y=len(values) / 256,
+        y=len(values) / 1024,
         color="r",
         linestyle="--",
         linewidth=1,
         label="Expected (uniform)",
     )
-    ax2.set_xlabel("Value (0-255)")
+    ax2.set_xlabel("Sample value (-32768 to 32767)")
     ax2.set_ylabel("Count")
     ax2.set_title("Distribution")
     ax2.legend()
