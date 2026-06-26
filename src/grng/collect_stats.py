@@ -1,0 +1,347 @@
+"""Compute statistical tests on grng-collect binary output files.
+
+Usage:
+    grng-collect-stats <data-dir> <period>
+
+Where <period> is one of:
+    2026-06-22        # full day summary (reads all .bin files for the day)
+    2026-06-22T14     # single hour (not yet implemented)
+"""
+import argparse
+import json
+import os
+import sys
+from collections import Counter
+
+import numpy as np
+from scipy.stats import chisquare
+from scipy.special import erfc
+
+
+# ---------------------------------------------------------------------------
+# Path helpers (mirrors collect_validate.py)
+# ---------------------------------------------------------------------------
+
+def date_dir(data_dir: str, date_str: str) -> str:
+    return os.path.join(data_dir, date_str)
+
+
+def bin_path(data_dir: str, date_str: str, hour: int) -> str:
+    return os.path.join(date_dir(data_dir, date_str), f"{hour:02d}.bin")
+
+
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+
+def load_day_bytes(data_dir: str, date_str: str) -> tuple[np.ndarray, list[str]]:
+    """Load all .bin files for a day into a single uint8 numpy array.
+
+    Returns (data, missing_hours) where missing_hours is a list of hour
+    strings for which no .bin file was found.
+    """
+    chunks = []
+    missing = []
+    for hour in range(24):
+        path = bin_path(data_dir, date_str, hour)
+        if not os.path.exists(path) or os.path.getsize(path) == 0:
+            missing.append(f"{hour:02d}")
+            continue
+        chunks.append(np.fromfile(path, dtype=np.uint8))
+    if not chunks:
+        print(f"Error: no .bin files found for {date_str}", file=sys.stderr)
+        sys.exit(1)
+    return np.concatenate(chunks), missing
+
+
+# ---------------------------------------------------------------------------
+# Byte-level tests
+# ---------------------------------------------------------------------------
+
+def test_byte_chi_square(data: np.ndarray) -> dict:
+    counts = np.bincount(data, minlength=256)
+    expected = len(data) / 256
+    stat, p_value = chisquare(counts)
+    return {
+        "counts": counts.tolist(),
+        "expected_per_bin": round(expected, 2),
+        "statistic": round(float(stat), 4),
+        "degrees_of_freedom": 255,
+        "p_value": round(float(p_value), 4),
+    }
+
+
+def test_byte_entropy(data: np.ndarray) -> dict:
+    counts = np.bincount(data, minlength=256)
+    probs = counts / len(data)
+    # Avoid log(0)
+    probs = probs[probs > 0]
+    entropy = float(-np.sum(probs * np.log2(probs)))
+    return {
+        "bits_per_byte": round(entropy, 6),
+        "expected": 8.0,
+        "delta": round(8.0 - entropy, 6),
+    }
+
+
+def test_byte_mean_std(data: np.ndarray) -> dict:
+    return {
+        "mean": round(float(data.mean()), 4),
+        "std": round(float(data.std()), 4),
+        "expected_mean": 127.5,
+        "expected_std": round(float(np.sqrt((256**2 - 1) / 12)), 4),
+    }
+
+
+def test_serial_correlation(data: np.ndarray) -> dict:
+    """Compute serial correlation coefficient between consecutive bytes."""
+    x = data[:-1].astype(float)
+    y = data[1:].astype(float)
+    x_mean = x.mean()
+    y_mean = y.mean()
+    numerator = float(np.mean((x - x_mean) * (y - y_mean)))
+    denominator = float(np.std(x) * np.std(y))
+    coefficient = numerator / denominator if denominator > 0 else 0.0
+    return {
+        "coefficient": round(coefficient, 6),
+        "note": "should be close to 0 for random data",
+    }
+
+
+def test_byte_pair_chi_square(data: np.ndarray) -> dict:
+    """Chi-square test over all consecutive byte pairs (256x256 = 65536 bins)."""
+    pairs = data[:-1].astype(np.uint32) * 256 + data[1:].astype(np.uint32)
+    counts = np.bincount(pairs, minlength=65536)
+    expected = len(pairs) / 65536
+    stat, p_value = chisquare(counts)
+    return {
+        "num_pairs": len(pairs),
+        "expected_per_bin": round(expected, 2),
+        "statistic": round(float(stat), 4),
+        "degrees_of_freedom": 65535,
+        "p_value": round(float(p_value), 4),
+    }
+
+
+def test_byte_longest_run(data: np.ndarray) -> dict:
+    """Find the longest run of any identical byte value."""
+    # Use numpy run-length encoding
+    changes = np.where(np.diff(data) != 0)[0]
+    run_lengths = np.diff(np.concatenate(([-1], changes, [len(data) - 1])))
+    longest = int(run_lengths.max())
+    idx = int(run_lengths.argmax())
+    # Reconstruct which byte value produced the longest run
+    start = int(changes[idx - 1] + 1) if idx > 0 else 0
+    byte_value = int(data[start])
+    expected = np.log(len(data)) / np.log(256)
+    return {
+        "byte_value": byte_value,
+        "observed_length": longest,
+        "expected_length": round(expected, 2),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Bit-level tests
+# ---------------------------------------------------------------------------
+
+def unpack_bits(data: np.ndarray) -> np.ndarray:
+    """Unpack uint8 array to a bit array (0s and 1s)."""
+    return np.unpackbits(data)
+
+
+def test_monobit(bits: np.ndarray) -> dict:
+    """NIST SP 800-22 monobit test.
+
+    Converts bits to +1/-1, computes the test statistic, and derives
+    a p-value via the complementary error function.
+    """
+    n = len(bits)
+    ones = int(bits.sum())
+    zeros = n - ones
+    # S_n = sum of (+1 for 1, -1 for 0)
+    s_n = abs(ones - zeros)
+    statistic = s_n / np.sqrt(n)
+    p_value = float(erfc(statistic / np.sqrt(2)))
+    return {
+        "n_bits": n,
+        "ones": ones,
+        "zeros": zeros,
+        "proportion_ones": round(ones / n, 6),
+        "statistic": round(float(statistic), 6),
+        "p_value": round(p_value, 6),
+    }
+
+
+def test_bit_runs(bits: np.ndarray) -> dict:
+    """NIST SP 800-22 runs test.
+
+    A run is a maximal sequence of consecutive identical bits.
+    Tests whether the number of runs is consistent with a random sequence.
+    """
+    n = len(bits)
+    proportion = float(bits.mean())
+
+    # Pre-test: if proportion is too far from 0.5 the runs test is invalid
+    tau = 2 / np.sqrt(n)
+    if abs(proportion - 0.5) >= tau:
+        return {
+            "n_bits": n,
+            "proportion_ones": round(proportion, 6),
+            "p_value": None,
+            "note": "pre-test failed: proportion of ones too far from 0.5",
+        }
+
+    # Count runs
+    runs = int(np.sum(np.diff(bits) != 0)) + 1
+    expected_runs = 2 * n * proportion * (1 - proportion)
+    variance = 2 * np.sqrt(2 * n) * proportion * (1 - proportion)
+    statistic = abs(runs - expected_runs) / variance
+    p_value = float(erfc(statistic))
+
+    return {
+        "n_bits": n,
+        "proportion_ones": round(proportion, 6),
+        "num_runs": runs,
+        "expected_runs": round(expected_runs, 2),
+        "statistic": round(float(statistic), 6),
+        "p_value": round(p_value, 6),
+    }
+
+
+def test_block_frequency(bits: np.ndarray, block_size: int = 128) -> dict:
+    """NIST SP 800-22 block frequency test.
+
+    Divides the bit stream into blocks of block_size bits and tests
+    whether each block has approximately block_size/2 ones.
+    """
+    n = len(bits)
+    num_blocks = n // block_size
+    blocks = bits[:num_blocks * block_size].reshape(num_blocks, block_size)
+    proportions = blocks.mean(axis=1)
+    chi_square = float(block_size * np.sum((proportions - 0.5) ** 2))
+
+    from scipy.stats import chi2
+    p_value = float(chi2.sf(chi_square, df=num_blocks))
+
+    return {
+        "block_size": block_size,
+        "num_blocks": num_blocks,
+        "chi_square": round(chi_square, 4),
+        "degrees_of_freedom": num_blocks,
+        "p_value": round(p_value, 6),
+    }
+
+
+def test_bit_longest_run(bits: np.ndarray) -> dict:
+    """Find the longest run of identical bits (0 or 1)."""
+    changes = np.where(np.diff(bits) != 0)[0]
+    run_lengths = np.diff(np.concatenate(([-1], changes, [len(bits) - 1])))
+    longest = int(run_lengths.max())
+    idx = int(run_lengths.argmax())
+    start = int(changes[idx - 1] + 1) if idx > 0 else 0
+    bit_value = int(bits[start])
+    expected = np.log2(len(bits))
+    return {
+        "bit_value": bit_value,
+        "observed_length": longest,
+        "expected_length": round(float(expected), 2),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Daily summary
+# ---------------------------------------------------------------------------
+
+def summarize_day(data_dir: str, date_str: str) -> dict:
+    data, missing_hours = load_day_bytes(data_dir, date_str)
+    bits = unpack_bits(data)
+
+    return {
+        "period": date_str,
+        "total_bytes": len(data),
+        "total_bits": len(bits),
+        "hours_missing": missing_hours,
+        "byte_level": {
+            "chi_square": test_byte_chi_square(data),
+            "entropy": test_byte_entropy(data),
+            "mean_std": test_byte_mean_std(data),
+            "serial_correlation": test_serial_correlation(data),
+            "byte_pair_chi_square": test_byte_pair_chi_square(data),
+            "longest_run": test_byte_longest_run(data),
+        },
+        "bit_level": {
+            "monobit": test_monobit(bits),
+            "runs": test_bit_runs(bits),
+            "block_frequency": test_block_frequency(bits),
+            "longest_run": test_bit_longest_run(bits),
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def parse_period(period: str) -> tuple[str, int | None]:
+    from datetime import datetime
+    if "T" in period:
+        parts = period.split("T")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid period format: {period!r}")
+        date_str = parts[0]
+        try:
+            hour = int(parts[1])
+        except ValueError:
+            raise ValueError(f"Invalid hour in period: {parts[1]!r}")
+        if not 0 <= hour <= 23:
+            raise ValueError(f"Hour must be 0-23, got {hour}")
+        datetime.strptime(date_str, "%Y-%m-%d")
+        return date_str, hour
+    else:
+        from datetime import datetime
+        datetime.strptime(period, "%Y-%m-%d")
+        return period, None
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="grng-collect-stats",
+        description="Compute statistical tests on grng-collect binary output files.",
+    )
+    parser.add_argument(
+        "data_dir",
+        type=str,
+        help="Root data directory (same as --output-dir passed to grng-collect).",
+    )
+    parser.add_argument(
+        "period",
+        type=str,
+        help=(
+            "Period to analyze. Either a date (2026-06-22) for a full day, "
+            "or a date and hour (2026-06-22T14) — hourly mode not yet implemented."
+        ),
+    )
+    return parser
+
+
+def main(argv=None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        date_str, hour = parse_period(args.period)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    if hour is not None:
+        raise NotImplementedError("Hourly mode is not yet implemented.")
+
+    result = summarize_day(args.data_dir, date_str)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
