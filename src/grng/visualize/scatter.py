@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from .base import to_uint8
+from .base import to_uint8, apply_dark_style
 
 
 def plot_scatter(data: bytes | np.ndarray, max_points: int = 50_000) -> Figure:
@@ -20,6 +20,7 @@ def plot_scatter(data: bytes | np.ndarray, max_points: int = 50_000) -> Figure:
     Returns:
         matplotlib Figure.
     """
+    apply_dark_style()
     arr = to_uint8(data)
     x = arr[:-1][:max_points].astype(float)
     y = arr[1:][:max_points].astype(float)

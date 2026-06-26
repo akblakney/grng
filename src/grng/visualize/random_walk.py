@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from .base import to_steps, to_uint8
+from .base import to_steps, to_uint8, apply_dark_style
 
 
 def plot_1d(data: bytes | np.ndarray, max_steps: int = 100_000) -> Figure:
@@ -18,12 +18,13 @@ def plot_1d(data: bytes | np.ndarray, max_steps: int = 100_000) -> Figure:
     Returns:
         matplotlib Figure.
     """
+    apply_dark_style()
     steps = to_steps(data)[:max_steps]
     walk = np.cumsum(steps)
 
     fig, ax = plt.subplots(figsize=(12, 5))
     ax.plot(walk, linewidth=0.5, color="steelblue")
-    ax.axhline(0, color="black", linewidth=0.5, linestyle="--")
+    ax.axhline(0, color="white", linewidth=0.5, linestyle="--", alpha=0.4)
     ax.set_xlabel("Step")
     ax.set_ylabel("Position")
     ax.set_title(f"1D Random Walk ({len(steps):,} steps)")
@@ -44,6 +45,7 @@ def plot_2d(data: bytes | np.ndarray, max_steps: int = 50_000) -> Figure:
     Returns:
         matplotlib Figure.
     """
+    apply_dark_style()
     arr = to_uint8(data)
     # Each byte -> +1 if >= 128, else -1
     steps = (arr.astype(np.int16) >= 128).astype(np.int8) * 2 - 1

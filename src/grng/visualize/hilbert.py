@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from .base import to_uint8
+from .base import to_uint8, apply_dark_style
 
 
 def _xy_to_hilbert(n: int, x: int, y: int) -> int:
@@ -60,6 +60,7 @@ def plot_hilbert(data: bytes | np.ndarray, order: int = 7) -> Figure:
     Returns:
         matplotlib Figure.
     """
+    apply_dark_style()
     arr = to_uint8(data)
     n = 2 ** order
     n_pixels = n * n

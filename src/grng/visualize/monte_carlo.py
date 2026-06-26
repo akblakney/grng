@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from .base import to_uint8
+from .base import to_uint8, apply_dark_style
 
 
 def plot_monte_carlo(data: bytes | np.ndarray, max_points: int = 10_000) -> Figure:
@@ -20,6 +20,7 @@ def plot_monte_carlo(data: bytes | np.ndarray, max_points: int = 10_000) -> Figu
     Returns:
         matplotlib Figure.
     """
+    apply_dark_style()
     arr = to_uint8(data)
     n = min(max_points, len(arr) // 2)
     x = arr[0::2][:n].astype(float) / 255.0

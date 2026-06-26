@@ -23,3 +23,8 @@ def to_coordinates(data: bytes | np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Split uint8 array into interleaved x and y coordinate arrays."""
     arr = to_uint8(data)
     return arr[0::2].astype(float), arr[1::2].astype(float)
+
+def apply_dark_style() -> None:
+    """Apply a dark theme to all subsequent matplotlib plots."""
+    import matplotlib.pyplot as plt
+    plt.style.use("dark_background")
