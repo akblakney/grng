@@ -210,19 +210,19 @@ def test_bit_runs(bits: np.ndarray) -> dict:
 
 
 def test_block_frequency(bits: np.ndarray, block_size: int = 128) -> dict:
-    """NIST SP 800-22 block frequency test.
+    """NIST SP 800-22 block frequency test."""
+    from scipy.special import gammaincc
 
-    Divides the bit stream into blocks of block_size bits and tests
-    whether each block has approximately block_size/2 ones.
-    """
     n = len(bits)
     num_blocks = n // block_size
     blocks = bits[:num_blocks * block_size].reshape(num_blocks, block_size)
     proportions = blocks.mean(axis=1)
-    chi_square = float(block_size * np.sum((proportions - 0.5) ** 2))
 
-    from scipy.stats import chi2
-    p_value = float(chi2.sf(chi_square, df=num_blocks))
+    # NIST formula: 4 * M * sum((pi - 0.5)^2)
+    chi_square = float(4 * block_size * np.sum((proportions - 0.5) ** 2))
+
+    # NIST p-value uses incomplete gamma function
+    p_value = float(gammaincc(num_blocks / 2, chi_square / 2))
 
     return {
         "block_size": block_size,
