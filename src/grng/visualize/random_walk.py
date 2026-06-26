@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from .base import to_steps, to_uint8, apply_dark_style
+from .base import to_steps, to_bits, to_uint8, apply_dark_style
 
 
 def plot_1d(data: bytes | np.ndarray, max_steps: int = 100_000) -> Figure:
@@ -32,7 +32,7 @@ def plot_1d(data: bytes | np.ndarray, max_steps: int = 100_000) -> Figure:
     return fig
 
 
-def plot_2d(data: bytes | np.ndarray, max_steps: int = 50_000) -> Figure:
+def plot_2d(data: bytes | np.ndarray, max_steps: int = 50_000, levy_flight: bool = False) -> Figure:
     """Plot a 2D random walk from byte stream.
 
     Consecutive byte pairs are used to determine x and y steps.
@@ -46,11 +46,15 @@ def plot_2d(data: bytes | np.ndarray, max_steps: int = 50_000) -> Figure:
         matplotlib Figure.
     """
     apply_dark_style()
-    arr = to_uint8(data)
-    # Each byte -> +1 if >= 128, else -1
-    steps = (arr.astype(np.int16) >= 128).astype(np.int8) * 2 - 1
-    x_steps = steps[0::2][:max_steps]
-    y_steps = steps[1::2][:max_steps]
+    
+    if levy_flight:
+        arr = to_uint8(data)
+        x_steps = arr[0::2][:max_steps].astype(np.int16) - 128  # range -128 to 127
+        y_steps = arr[1::2][:max_steps].astype(np.int16) - 128
+    else:
+        bits = to_bits(data)[:max_steps * 2]
+        x_steps = bits[0::2].astype(np.int8) * 2 - 1 
+        y_steps = bits[1::2].astype(np.int8) * 2 - 1
     n = min(len(x_steps), len(y_steps))
     x = np.cumsum(x_steps[:n])
     y = np.cumsum(y_steps[:n])
