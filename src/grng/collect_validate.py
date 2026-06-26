@@ -231,6 +231,36 @@ def summarize_day(data_dir: str, date_str: str) -> dict:
         },
     }
 
+def plot_values(values: list[int], period: str) -> None:
+    """Plot values as a waveform and histogram side by side."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+    fig.suptitle(f"Values — {period}", fontsize=14)
+
+    # Waveform
+    ax1.plot(values, linewidth=0.5)
+    ax1.set_xlabel("Index")
+    ax1.set_ylabel("Value")
+    ax1.set_title("Waveform")
+
+    # Histogram
+    ax2.hist(values, bins=256, range=(0, 255), edgecolor="none")
+    ax2.axhline(
+        y=len(values) / 256,
+        color="r",
+        linestyle="--",
+        linewidth=1,
+        label="Expected (uniform)",
+    )
+    ax2.set_xlabel("Value (0-255)")
+    ax2.set_ylabel("Count")
+    ax2.set_title("Distribution")
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -280,6 +310,12 @@ def build_parser() -> argparse.ArgumentParser:
             "summary, or a date and hour (2026-06-22T14) for a single hour."
         ),
     )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Plot the values from the validation file (hourly mode only).",
+    )
+
     return parser
 
 
@@ -295,10 +331,21 @@ def main(argv=None) -> int:
 
     if hour is not None:
         result = summarize_hour(args.data_dir, date_str, hour)
+        print(json.dumps(result, indent=2))
+        if args.plot:
+            validation = load_json(
+                hour_paths(args.data_dir, date_str, hour)["validation"]
+            )
+            if validation is None or not validation.get("values_results"):
+                print("No values data available to plot.", file=sys.stderr)
+            else:
+                plot_values(validation["values_results"], result["period"])
     else:
+        if args.plot:
+            print("Warning: --plot is only supported for hourly mode. Ignoring.", file=sys.stderr)
         result = summarize_day(args.data_dir, date_str)
+        print(json.dumps(result, indent=2))
 
-    print(json.dumps(result, indent=2))
     return 0
 
 
