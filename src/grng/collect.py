@@ -48,9 +48,9 @@ def hour_stem(dt: datetime) -> str:
 
 
 def hour_paths(output_dir: str, dt: datetime) -> dict:
-    """Return all file paths for a given UTC hour."""
-    d = hour_dir(output_dir, dt)
-    stem = hour_stem(dt)
+    d = os.path.join(output_dir, "raw", dt.strftime("%Y-%m-%d"))
+    os.makedirs(d, exist_ok=True)
+    stem = dt.strftime("%H")
     return {
         "bin":        os.path.join(d, f"{stem}.bin"),
         "meta":       os.path.join(d, f"{stem}.meta.json"),
