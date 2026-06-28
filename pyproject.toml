@@ -26,6 +26,7 @@ grng-collect-validate = "grng.collect_validate:main"
 grng-collect-post = "grng.collect_post:main"
 grng-collect-visualize = "grng.collect_visualize:main"
 grng-visualize = "grng.visualize_live:main"
+grng-collect-summarize-stats = "grng.collect_summarize_stats:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
