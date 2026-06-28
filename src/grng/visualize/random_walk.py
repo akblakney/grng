@@ -5,7 +5,7 @@ from matplotlib.figure import Figure
 from .base import to_steps, to_bits, to_uint8, apply_dark_style
 
 
-def plot_1d(data: bytes | np.ndarray, max_steps: int = 100_000) -> Figure:
+def plot_1d(data: bytes | np.ndarray, max_steps: int = 1_000_000) -> Figure:
     """Plot a 1D random walk from bit stream.
 
     Each bit is interpreted as a +1 or -1 step. The cumulative sum
@@ -32,7 +32,7 @@ def plot_1d(data: bytes | np.ndarray, max_steps: int = 100_000) -> Figure:
     return fig
 
 
-def plot_2d(data: bytes | np.ndarray, max_steps: int = 50_000, levy_flight: bool = False) -> Figure:
+def plot_2d(data: bytes | np.ndarray, max_steps: int = 500_000, levy_flight: bool = False) -> Figure:
     """Plot a 2D random walk from byte stream.
 
     Consecutive byte pairs are used to determine x and y steps.

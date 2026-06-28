@@ -63,7 +63,6 @@ def test_byte_chi_square(data: np.ndarray) -> dict:
     expected = len(data) / 256
     stat, p_value = chisquare(counts)
     return {
-        "counts": counts.tolist(),
         "expected_per_bin": round(expected, 2),
         "statistic": round(float(stat), 4),
         "degrees_of_freedom": 255,
