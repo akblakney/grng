@@ -146,23 +146,26 @@ def print_table(
     dates: list[str],
     raw_results: dict[str, dict | None],
     post_results: dict[str, dict | None],
+    raw_stats: dict[str, dict | None],
+    post_stats: dict[str, dict | None],
     key: str,
 ) -> None:
     columns = build_columns(key)
     col_labels = [label for _, label in columns]
 
-    # Build header
-    # date | raw col1 | raw col2 | ... | post col1 | post col2 | ...
     date_w = 12
     col_w = 14
+    bytes_w = 14
 
     def pad(s: str, w: int) -> str:
         return s[:w].ljust(w)
 
     def header_row() -> str:
         parts = [pad("date", date_w)]
+        parts.append(pad("raw:bytes", bytes_w))
         for label in col_labels:
             parts.append(pad(f"raw:{label}", col_w))
+        parts.append(pad("post:bytes", bytes_w))
         for label in col_labels:
             parts.append(pad(f"post:{label}", col_w))
         return "  ".join(parts)
@@ -170,17 +173,26 @@ def print_table(
     def separator_row() -> str:
         total_width = (
             date_w + 2 +
-            (col_w + 2) * len(col_labels) * 2
+            (bytes_w + 2) +
+            (col_w + 2) * len(col_labels) +
+            (bytes_w + 2) +
+            (col_w + 2) * len(col_labels)
         )
         return "-" * total_width
 
     def data_row(date_str: str) -> str:
         raw = raw_results.get(date_str)
         post = post_results.get(date_str)
+        raw_s = raw_stats.get(date_str)
+        post_s = post_stats.get(date_str)
         parts = [pad(date_str, date_w)]
+        raw_bytes = raw_s.get("total_bytes") if raw_s else None
+        parts.append(pad(format_value(raw_bytes), bytes_w))
         for field, _ in columns:
             v = raw.get(field) if raw else None
             parts.append(pad(format_value(v), col_w))
+        post_bytes = post_s.get("total_bytes") if post_s else None
+        parts.append(pad(format_value(post_bytes), bytes_w))
         for field, _ in columns:
             v = post.get(field) if post else None
             parts.append(pad(format_value(v), col_w))
@@ -192,7 +204,6 @@ def print_table(
     for date_str in dates:
         print(data_row(date_str))
     print()
-
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -241,6 +252,8 @@ def main(argv=None) -> int:
 
     raw_results: dict[str, dict | None] = {}
     post_results: dict[str, dict | None] = {}
+    raw_stats_all: dict[str, dict | None] = {}
+    post_stats_all: dict[str, dict | None] = {}
     dates_with_data = []
 
     for date_str in dates:
@@ -259,6 +272,8 @@ def main(argv=None) -> int:
 
         raw_results[date_str] = raw_result
         post_results[date_str] = post_result
+        raw_stats_all[date_str] = raw_stats
+        post_stats_all[date_str] = post_stats
         dates_with_data.append(date_str)
 
     if not dates_with_data:
@@ -268,7 +283,14 @@ def main(argv=None) -> int:
         )
         return 1
 
-    print_table(dates_with_data, raw_results, post_results, args.test_key)
+    print_table(
+        dates_with_data,
+        raw_results,
+        post_results,
+        raw_stats_all,
+        post_stats_all,
+        args.test_key,
+    )
     return 0
 
 
