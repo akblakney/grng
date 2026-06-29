@@ -49,11 +49,61 @@ def load_bin(path: str) -> np.ndarray | None:
 # Core distillation
 # ---------------------------------------------------------------------------
 
+import numpy as np
+
+def xor_fold(arr: np.ndarray, n: int) -> np.ndarray:
+    """
+    Recursively XOR-fold a uint8 array until its length is == n.
+    If the final length is greater than n, truncate to n.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        1-D uint8 array.
+    n : int
+        Desired maximum output length.
+
+    Returns
+    -------
+    np.ndarray
+        Folded uint8 array of length n or None if
+        initially shorter than n).
+    """
+    if arr.dtype != np.uint8:
+        raise TypeError("arr must have dtype=np.uint8")
+    if arr.ndim != 1:
+        raise ValueError("arr must be 1-dimensional")
+    if n <= 0:
+        raise ValueError("n must be positive")
+
+    # return None if it cannot be done
+    if len(arr) < n:
+        return None
+
+    half = len(arr) // 2
+
+    # no fold needed just truncate
+    if half < n:
+        return arr[:n]
+
+    # Drop the middle element if the length is odd.
+    a = arr[:half]
+    b = arr[-half:]
+
+    folded = np.bitwise_xor(a, b)
+
+    return xor_fold(folded, n)
+
 def xor_pair(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """XOR two uint8 arrays, truncating to the shorter length."""
     n = min(len(a), len(b))
-    discarded = abs(len(a) - len(b))
-    return np.bitwise_xor(a[:n], b[:n]), n, discarded
+    if len(a) < len(b):
+        discarded_bytes = b[n:]
+    elif len(b) < len(a):
+        discarded_bytes = a[n:]
+    else:
+        discarded_bytes = np.ndarray(0, dtype=np.uint8)
+    return np.bitwise_xor(a[:n], b[:n]), discarded_bytes
 
 
 def distill_day(
@@ -64,7 +114,7 @@ def distill_day(
     """Load all hourly .bin files for a day, XOR consecutive pairs,
     and concatenate the results.
 
-    Returns (distilled_data, report) where report contains statistics
+    Returns (distilled_data, report, discarded_bytes) where report contains statistics
     about which pairs were processed, skipped, and how many bytes were
     discarded due to length mismatches.
     """
@@ -112,13 +162,17 @@ def distill_day(
 
     # XOR each pair and collect chunks
     chunks = []
+    discarded_chunks = []
     pair_reports = []
 
     for h0, h1 in pairs:
         a = hours_data[h0]
         b = hours_data[h1]
-        result, kept, discarded = xor_pair(a, b)
+        result, discarded_bytes = xor_pair(a, b)
+        kept = result.size
+        discarded = discarded_bytes.size
         chunks.append(result)
+        discarded_chunks.append(discarded_bytes)
         pair_reports.append({
             "hours": f"{h0:02d}+{h1:02d}",
             "bytes_a": len(a),
@@ -135,6 +189,7 @@ def distill_day(
             )
 
     distilled = np.concatenate(chunks)
+    diamond = xor_fold(np.concatenate(discarded_chunks), 32)
 
     report = {
         "date": date_str,
@@ -148,7 +203,7 @@ def distill_day(
         "total_output_bytes": len(distilled),
     }
 
-    return distilled, report
+    return distilled, report, diamond
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +270,7 @@ def main(argv=None) -> int:
     if args.verbose:
         print(f"Distilling {args.date}...", file=sys.stderr)
 
-    distilled, report = distill_day(args.data_dir, args.date, verbose=args.verbose)
+    distilled, report, _ = distill_day(args.data_dir, args.date, verbose=args.verbose)
 
     # Write distilled output
     distilled.tofile(output_path)

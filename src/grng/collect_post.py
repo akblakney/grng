@@ -36,6 +36,7 @@ from .collect_stats import (
     unpack_bits,
 )
 from .post.distill import distill_day
+from .post.bitmap import bitmap256
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +66,11 @@ def raw_daily_stats_path(base_dir: str, date_str: str) -> str:
 def post_daily_bin_path(base_dir: str, date_str: str) -> str:
     return os.path.join(post_date_dir(base_dir, date_str), "daily.bin")
 
+def post_diamond_bin_path(base_dir: str, date_str: str) -> str:
+    return os.path.join(post_date_dir(base_dir, date_str), "diamond.bin")
+
+def get_post_diamond_bitmap_path(base_dir: str, date_str: str) -> str:
+    return os.path.join(post_date_dir(base_dir, date_str), "diamond.png")
 
 def post_daily_stats_path(base_dir: str, date_str: str) -> str:
     return os.path.join(post_date_dir(base_dir, date_str), "daily_stats.json")
@@ -127,6 +133,8 @@ def process_date(base_dir: str, date_str: str, verbose: bool) -> None:
 
     raw_stats_path = raw_daily_stats_path(base_dir, date_str)
     post_bin_path = post_daily_bin_path(base_dir, date_str)
+    post_diamond_path = post_diamond_bin_path(base_dir, date_str)
+    post_diamond_bitmap_path = get_post_diamond_bitmap_path(base_dir, date_str)
     post_stats_path = post_daily_stats_path(base_dir, date_str)
 
     all_present = (
@@ -166,13 +174,19 @@ def process_date(base_dir: str, date_str: str, verbose: bool) -> None:
     else:
         log("distilling hourly files...")
         try:
-            distilled, distill_report = distill_day(
+            distilled, distill_report, diamond = distill_day(
                 raw_dir(base_dir), date_str, verbose=verbose
             )
         except SystemExit:
             log("distillation failed (not enough hours), skipping")
             return
         distilled.tofile(post_bin_path)
+        if diamond is not None:
+            diamond.tofile(post_diamond_path)
+            bitmap256(diamond, post_diamond_bitmap_path)
+
+        else:
+            log("not enough discarded bytes to write diamond, skipping")
         log(
             f"wrote post/daily.bin "
             f"({len(distilled):,} bytes from {distill_report['num_pairs']} pairs)"
