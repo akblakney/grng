@@ -32,7 +32,7 @@ def plot_1d(data: bytes | np.ndarray, max_steps: int = 1_000_000) -> Figure:
     return fig
 
 
-def plot_2d(data: bytes | np.ndarray, max_steps: int = 500_000, levy_flight: bool = False) -> Figure:
+def plot_2d(data: bytes | np.ndarray, max_steps: int = 900_000, levy_flight: bool = False) -> Figure:
     """Plot a 2D random walk from byte stream.
 
     Consecutive byte pairs are used to determine x and y steps.

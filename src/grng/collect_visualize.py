@@ -24,7 +24,7 @@ from .visualize.hilbert import plot_hilbert
 # ---------------------------------------------------------------------------
 
 def bin_path(data_dir: str, date_str: str, hour: int) -> str:
-    return os.path.join(data_dir, date_str, f"{hour:02d}.bin")
+    return os.path.join(data_dir, "raw", date_str, f"{hour:02d}.bin")
 
 
 def load_hour(data_dir: str, date_str: str, hour: int) -> np.ndarray:
